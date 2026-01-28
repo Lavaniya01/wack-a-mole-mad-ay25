@@ -26,79 +26,67 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                WackAMoleApp()
+                App()
             }
         }
     }
 }
 
 @Composable
-fun WackAMoleApp() {
-    val navController = rememberNavController()
+fun App() {
+    val nav = rememberNavController()
 
-    NavHost(navController = navController, startDestination = "game") {
+    NavHost(navController = nav, startDestination = "game") {
         composable("game") {
-            GameScreen(
-                onOpenSettings = { navController.navigate("settings") }
-            )
+            GameScreen {
+                nav.navigate("settings")
+            }
         }
         composable("settings") {
-            SettingsScreen(
-                onBack = { navController.popBackStack() }
-            )
+            SettingsScreen {
+                nav.popBackStack()
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GameScreen(
-    onOpenSettings: () -> Unit
-) {
+fun GameScreen(openSettings: () -> Unit) {
+
     val context = LocalContext.current
-    val prefs = remember {
-        context.getSharedPreferences("wackamole_prefs", Context.MODE_PRIVATE)
-    }
+    val prefs = context.getSharedPreferences("wackamole", Context.MODE_PRIVATE)
 
-    // Persistent high score
-    var highScore by remember { mutableIntStateOf(prefs.getInt("high_score", 0)) }
+    var highScore by remember { mutableIntStateOf(prefs.getInt("highScore", 0)) }
 
-    // Game state
     var score by remember { mutableIntStateOf(0) }
-    var timeLeft by remember { mutableIntStateOf(30) } // 30 or 60 seconds (your choice)
-    var moleIndex by remember { mutableIntStateOf(Random.nextInt(0, 9)) }
-    var isRunning by remember { mutableStateOf(false) }
-    var showGameOver by remember { mutableStateOf(false) }
+    var time by remember { mutableIntStateOf(30) }
+    var molePos by remember { mutableIntStateOf(Random.nextInt(0, 9)) }
+    var running by remember { mutableStateOf(false) }
+    var gameOver by remember { mutableStateOf(false) }
 
-    // TIMER: decreases every second
-    LaunchedEffect(isRunning) {
-        if (isRunning) {
-            showGameOver = false
-            while (timeLeft > 0 && isRunning) {
+    LaunchedEffect(running) {
+        if (running) {
+            gameOver = false
+            while (time > 0 && running) {
                 delay(1000)
-                timeLeft -= 1
+                time--
             }
+            running = false
+            gameOver = true
 
-            // Game ends
-            if (timeLeft <= 0) {
-                isRunning = false
-                showGameOver = true
-
-                // Update high score on game end
-                if (score > highScore) {
-                    highScore = score
-                    prefs.edit().putInt("high_score", score).apply()
-                }
+            if (score > highScore) {
+                highScore = score
+                prefs.edit().putInt("highScore", score).apply()
             }
         }
     }
 
-    // MOLE MOVEMENT: changes position every 700–1000ms
-    LaunchedEffect(isRunning) {
-        if (isRunning) {
-            while (timeLeft > 0 && isRunning) {
-                delay(Random.nextLong(700, 1001))
-                moleIndex = Random.nextInt(0, 9)
+    LaunchedEffect(running) {
+        if (running) {
+            while (time > 0 && running) {
+                delay(Random.nextLong(700, 1000))
+                molePos = Random.nextInt(0, 9)
             }
         }
     }
@@ -108,149 +96,118 @@ fun GameScreen(
             TopAppBar(
                 title = { Text("Wack-a-Mole") },
                 actions = {
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = "Settings"
-                        )
+                    IconButton(onClick = openSettings) {
+                        Icon(Icons.Filled.Settings, null)
                     }
                 }
             )
         }
-    ) { innerPadding ->
+    ) { pad ->
 
         Column(
             modifier = Modifier
-                .padding(innerPadding)
+                .padding(pad)
                 .fillMaxSize()
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "High Score: $highScore",
-                style = MaterialTheme.typography.bodyLarge
-            )
-
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(4.dp)
-            ) {
+            Card(modifier = Modifier.fillMaxWidth()) {
                 Row(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    modifier = Modifier.padding(16.dp)
                 ) {
-                    Text("Score: $score", style = MaterialTheme.typography.titleMedium)
-                    Text("Time: $timeLeft", style = MaterialTheme.typography.titleMedium)
+                    Text("Score: $score")
+                    Spacer(modifier = Modifier.width(24.dp))
+                    Text("Time: $time")
                 }
             }
 
+            Spacer(Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Start / Restart buttons
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = {
-                        score = 0
-                        timeLeft = 30
-                        moleIndex = Random.nextInt(0, 9)
-                        isRunning = true
-                        showGameOver = false
-                    }
-                ) { Text("Start") }
-
-                OutlinedButton(
-                    onClick = {
-                        score = 0
-                        timeLeft = 30
-                        moleIndex = Random.nextInt(0, 9)
-                        isRunning = true
-                        showGameOver = false
-                    }
-                ) { Text("Restart") }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // 3x3 grid
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                for (row in 0 until 3) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        for (col in 0 until 3) {
-                            val index = row * 3 + col
-                            HoleButton(
-                                isMole = (index == moleIndex),
-                                enabled = isRunning,
+            Column {
+                for (r in 0..2) {
+                    Row {
+                        for (c in 0..2) {
+                            val idx = r * 3 + c
+                            Button(
+                                modifier = Modifier
+                                    .size(88.dp)
+                                    .padding(4.dp),
+                                enabled = running,
+                                shape = RoundedCornerShape(12.dp),
                                 onClick = {
-                                    if (isRunning && index == moleIndex) {
-                                        score += 1
+                                    if (running && idx == molePos) {
+                                        score++
+                                        molePos = Random.nextInt(0, 9)
                                     }
                                 }
-                            )
+                            ) {
+                                if (idx == molePos) Text("🐹")
+                            }
                         }
                     }
                 }
             }
 
-            if (showGameOver) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Game over! Final score: $score",
-                    style = MaterialTheme.typography.titleMedium
-                )
+            Spacer(Modifier.height(8.dp))
+            Text("High Score: $highScore")
+
+            if (gameOver) {
+                Spacer(Modifier.height(8.dp))
+                Text("Game Over! Final Score: $score")
+            }
+
+            Spacer(Modifier.weight(1f))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        score = 0
+                        time = 30
+                        molePos = Random.nextInt(0, 9)
+                        running = true
+                    }
+                ) {
+                    Text("Start")
+                }
+
+                Spacer(Modifier.width(10.dp))
+
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        score = 0
+                        time = 30
+                        molePos = Random.nextInt(0, 9)
+                        running = true
+                    }
+                ) {
+                    Text("Restart")
+                }
             }
         }
     }
 }
 
-@Composable
-private fun HoleButton(
-    isMole: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.size(88.dp),
-        shape = RoundedCornerShape(14.dp),
-        contentPadding = PaddingValues(0.dp)
-    ) {
-        Text(text = if (isMole) "🐹" else "")
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(
-    onBack: () -> Unit
-) {
+fun SettingsScreen(back: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Settings") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                    IconButton(onClick = back) {
+                        Icon(Icons.Filled.ArrowBack, null)
                     }
                 }
             )
         }
-    ) { innerPadding ->
+    ) { pad ->
         Box(
             modifier = Modifier
-                .padding(innerPadding)
+                .padding(pad)
                 .fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
