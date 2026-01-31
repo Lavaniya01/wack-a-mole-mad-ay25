@@ -8,19 +8,6 @@ This project was developed to satisfy the assignment requirements for the module
 The application is a **Wack-a-Mole game** built using Android Studio and Jetpack Compose.  
 The focus of this submission is on fulfilling the **Basic/Core requirements** of the assignment.
 
----
-
-## 📂 Project Structure
-wack-a-mole-mad-ay25/
-├── Basic/ # Core requirements implementation
-├── README.md
-└── LICENSE
-
-- **Basic/** contains the fully working core implementation of the Wack-a-Mole game.
-- **Advanced/** was reserved for extended features such as database and multi-user support but was not implemented for this submission.
-
----
-
 ## 🕹️ Basic Features Implemented
 - Single-player Wack-a-Mole gameplay
 - 3×3 grid of buttons representing mole holes
